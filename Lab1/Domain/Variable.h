@@ -1,6 +1,8 @@
 #pragma once
 #include <vector>
-
+#include <mutex>
+#include <algorithm>
+#include <iostream>
 
 class Variable
 {
@@ -8,10 +10,12 @@ private:
     int value;
     std::vector<Variable*> inputs;
     std::vector<Variable*> dependcies;
-protected:
+
 public:
+    std::recursive_mutex mutex;
+    
     // Constructor and Destructor
-    Variable(int value);
+    Variable(int value = 0);
     ~Variable();
 
     // Getters and Setters
@@ -26,4 +30,10 @@ public:
     void SubstractValue(int value);
     void AddInput(Variable* input);
     void AddDependency(Variable* dependency);
+    void Lock();
+    void LockInputs();
+    void Unlock();
+    void LockDependencies();
+    void UnlockDependencies();
+
 };
