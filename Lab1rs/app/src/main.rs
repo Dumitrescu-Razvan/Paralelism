@@ -51,11 +51,15 @@ impl SharedState {
 
     // Consistency check to verify all secondary variables are sums of their inputs
     fn check_consistency(&self) {
-        let primary = self.primary.write().unwrap(); // Read lock
-        let secondary = self.secondary.write().unwrap(); // Read lock
+        let primary = self.primary.read().unwrap(); // Read lock
+        let secondary = self.secondary.read().unwrap(); // Read lock
         for (var, (inputs, expected_sum)) in secondary.iter() {
             let actual_sum: i32 = inputs.iter().map(|v| *primary.get(v).unwrap_or(&0)).sum();
-            assert_eq!(&actual_sum, expected_sum, "Inconsistent value for {}: expected {}, got {}", var, expected_sum, actual_sum);
+            assert_eq!(
+                &actual_sum, expected_sum,
+                "Inconsistent value for {}: expected {}, got {}",
+                var, expected_sum, actual_sum
+            );
         }
         println!("Consistency check passed!");
     }
@@ -81,7 +85,7 @@ fn main() {
     // Generate random secondary variables based on random primary inputs
     for i in 1..=num_secondary_vars {
         let var_name = format!("s{}", i);
-        let num_inputs = rng.gen_range(2..=num_primary_vars/2); // Random number of inputs (2 or 3)
+        let num_inputs = rng.gen_range(2..=num_primary_vars / 2); // Random number of inputs (2 or 3)
         let mut inputs = Vec::new();
         while inputs.len() < num_inputs {
             let input = format!("x{}", rng.gen_range(1..=num_primary_vars));
@@ -101,32 +105,36 @@ fn main() {
         println!("{} = {} (inputs: {:?})", var, sum, inputs);
     }
 
+    // Spawn a thread to randomly check consistency during updates
+    let shared_state_consistency = Arc::clone(&shared_state);
+    let check_handle = thread::spawn(move || {
+        let mut thread_rng = rand::thread_rng();
+        for _ in 0..5 {
+            // Wait for a random period of time before checking consistency
+            shared_state_consistency.check_consistency();
+            thread::sleep(Duration::from_millis(thread_rng.gen_range(500..1000)));
+        }
+    });
+
     // Spawn multiple threads to update primary variables concurrently
     let mut handles = vec![];
     for i in 0..thread_number {
         let shared_state = Arc::clone(&shared_state);
         let handle = thread::spawn(move || {
-            let var = format!("x{}", (i % num_primary_vars) + 1);
-            let mut thread_rng = rand::thread_rng();
-            let new_value = thread_rng.gen_range(0..100); // Random value between 0 and 100
-            shared_state.update_primary(&var, new_value);
-
             // Simulate some delay between updates
-            thread::sleep(Duration::from_millis(thread_rng.gen_range(100..500)));
+            let mut thread_rng = rand::thread_rng();
+            thread::sleep(Duration::from_millis(thread_rng.gen_range(1000..5000)));
+            
+            let mut rng = rand::thread_rng();
+            let rand_var = format!("x{}", rng.gen_range(1..=num_primary_vars));
+            //let var = format!("x{}", (i % num_primary_vars) + 1);
+            print!("Thread {}: Updating {}... \n", i, rand_var);
+            let new_value = thread_rng.gen_range(0..100); // Random value between 0 and 100
+            shared_state.update_primary(&rand_var, new_value);
+
         });
         handles.push(handle);
     }
-
-    // Spawn a thread to randomly check consistency during updates
-    let shared_state_consistency = Arc::clone(&shared_state);
-    let check_handle = thread::spawn(move || {
-            let mut thread_rng = rand::thread_rng();
-            for _ in 0..5 {
-                // Wait for a random period of time before checking consistency
-                thread::sleep(Duration::from_millis(thread_rng.gen_range(500..1000)));
-                shared_state_consistency.check_consistency();
-            }
-        });
 
     // Wait for all update threads to finish
     for handle in handles {
