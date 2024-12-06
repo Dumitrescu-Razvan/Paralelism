@@ -6,14 +6,14 @@ Given a directed graph, find a Hamiltonean cycle, if one exists. Use multiple th
 */
 
 use std::sync::mpsc;
-use threadpool::ThreadPool;
+use std::thread;
 
 fn hamiltonian_cycle(graph: Vec<Vec<i32>>) -> Vec<usize> {
     let n = graph.len();
     let mut cycle = vec![];
     let visited = vec![false; n];
 
-    let pool = ThreadPool::new(4);
+    let mut handles= Vec::new();
 
     let (tx, rx) = mpsc::channel();
 
@@ -21,16 +21,19 @@ fn hamiltonian_cycle(graph: Vec<Vec<i32>>) -> Vec<usize> {
         let tx = tx.clone();
         let graph = graph.clone();
         let visited = visited.clone();
-        pool.execute(move || {
+        let cycle = cycle.clone();
+        handles.push(thread::spawn(move || {
             let mut visited = visited;
-            let mut cycle = vec![];
+            let mut cycle = cycle;
             visited[i] = true;
             cycle.push(i);
             hamiltonian_cycle_helper(i, &graph, &mut visited, &mut cycle, &tx);
-        });
+        }));
     }
 
-    pool.join();
+    for handle in handles {
+        handle.join().unwrap();
+    }
 
     for _ in 0..n {
         let c = rx.recv().unwrap();
@@ -48,7 +51,7 @@ fn hamiltonian_cycle_helper(v: usize, graph: &Vec<Vec<i32>>, visited: &mut Vec<b
         return;
     }
 
-    let pool = ThreadPool::new(4);
+    let mut handles = Vec::new();
 
     for i in 0..graph.len() {
         if graph[v][i] == 1 && !visited[i] {
@@ -58,13 +61,15 @@ fn hamiltonian_cycle_helper(v: usize, graph: &Vec<Vec<i32>>, visited: &mut Vec<b
             let graph = graph.clone();
             visited[i] = true;
             cycle.push(i);
-            pool.execute(move || {
+            handles.push(thread::spawn(move || {
                 hamiltonian_cycle_helper(i, &graph, &mut visited, &mut cycle, &tx);
-            });
+            }));
         }
     }
 
-    pool.join();
+    for handle in handles {
+        handle.join().unwrap();
+    }
 }
 
 fn main() {
