@@ -54,8 +54,8 @@ fn main() {
     let rank = world.rank() as usize;
 
     // Example polynomials
-    let poly_a = vec![1, 2, 3, 4]; // 1 + 2x + 3x^2 + 4x^3
-    let poly_b = vec![4, 3, 2, 1]; // 4 + 3x + 2x^2 + x^3
+    let poly_a = vec![1, 2, 3, 4, 5, 6, 7, 8]; // 1 + 2x + 3x^2 + 4x^3
+    let poly_b = vec![8, 7, 6, 5, 4, 3, 2, 1]; // 4 + 3x + 2x^2 + x^3
 
     // Split work among nodes
     let chunk_size = poly_a.len() / size;
@@ -84,8 +84,8 @@ fn main() {
         karatsuba(&a_chunk, &b_chunk)
     };
 
-    //Shift the result to the right by "rank" positions
-    for _ in 0..rank {
+    //Shift the result to the right by rank * chunk_size positions
+    for _ in 0..rank * chunk_size {
         local_result.insert(0, 0);
         local_result.pop();
     } 
