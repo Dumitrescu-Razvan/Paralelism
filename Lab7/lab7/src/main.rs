@@ -12,9 +12,10 @@ fn multiply_regular(a: &[i32], b: &[i32]) -> Vec<i32> {
     result
 }
 
+/// Function to multiply two polynomials using the Karatsuba method
 fn karatsuba(a: &[i32], b: &[i32]) -> Vec<i32> {
     let n = a.len();
-    if n <= 1 {
+    if n == 1 {
         return vec![a[0] * b[0]];
     }
     let k = n / 2;
@@ -42,20 +43,10 @@ fn karatsuba(a: &[i32], b: &[i32]) -> Vec<i32> {
         result[i + n] += a2b2[i];
         result[i + k] += a1a2b1b2[i] - a1b1[i] - a2b2[i];
     }
+
     result
 }
 
-/// Helper function to add two polynomials
-fn add_polynomials(a: &[i32], b: &[i32]) -> Vec<i32> {
-    let n = a.len().max(b.len());
-    let mut result = vec![0; n];
-    for i in 0..n {
-        result[i] = a.get(i).copied().unwrap_or(0) + b.get(i).copied().unwrap_or(0);
-    }
-    result
-}
-
-/// Main function using MPI for distributed computation
 fn main() {
     let universe = mpi::initialize().unwrap();
     let world = universe.world();
@@ -75,15 +66,30 @@ fn main() {
         (rank + 1) * chunk_size
     };
 
-    let a_chunk = &poly_a[start..end];
-    let b_chunk = &poly_b;
+    let mut a_chunk = poly_a[start..end].to_vec();
+    let mut b_chunk = poly_b.to_vec();
+
+    // Pad chunks to the same length if necessary
+    while a_chunk.len() < b_chunk.len() {
+        a_chunk.push(0);
+    }
+    while b_chunk.len() < a_chunk.len() {
+        b_chunk.push(0);
+    }
 
     // Compute the result for the assigned chunk
-    let local_result = if rank % 2 == 0 {
-        multiply_regular(a_chunk, b_chunk)
+    let mut local_result = if rank % 2 == 0 {
+        multiply_regular(&a_chunk, &b_chunk)
     } else {
-        karatsuba(a_chunk, b_chunk)
+        karatsuba(&a_chunk, &b_chunk)
     };
+
+    //Shift the result to the right by "rank" positions
+    for _ in 0..rank {
+        local_result.insert(0, 0);
+        local_result.pop();
+    } 
+    println!("Rank: {}, Result: {:?}", rank, local_result);
 
     // Prepare global result buffer
     let mut global_result = vec![0; poly_a.len() + poly_b.len() - 1];
@@ -95,5 +101,3 @@ fn main() {
         println!("Final Result: {:?}", global_result);
     }
 }
-
-
